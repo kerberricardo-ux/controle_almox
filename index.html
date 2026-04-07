@@ -84,17 +84,14 @@
     <script>
         let DB = {
             users: [{ id: 1, username: "admin", password: "admin", role: "DIRETORIA", name: "Ricardo Kerber" }],
-            sectors: ["Portaria", "Limpeza", "Ronda", "Administrativo"],
             products: [
                 { id: 1, name: "Uniforme Segurança G", category: "Uniforme", qty: 45, minStock: 20, unitValue: 120.00 },
                 { id: 2, name: "Detergente 5L", category: "Limpeza", qty: 5, minStock: 15, unitValue: 35.00 }
-            ],
-            movements: []
+            ]
         };
 
         let currentUser = null;
 
-        // Persistência
         const save = () => { localStorage.setItem('qga_db', JSON.stringify(DB)); updateUI(); };
         const formatCurrency = (v) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
         const getCritical = () => DB.products.filter(p => p.qty <= p.minStock);
@@ -107,7 +104,7 @@
                 currentUser = user;
                 document.getElementById('login-screen').classList.add('hidden');
                 document.getElementById('main-app').classList.remove('hidden');
-                save();
+                updateUI();
                 navigateTo('dashboard');
             } else alert("Usuário ou senha incorretos.");
         }
@@ -145,17 +142,36 @@
                 `;
             } else if (view === 'estoque') {
                 renderEstoque();
+            } else if (view === 'solicitacoes') {
+                main.innerHTML = `
+                    <h1 class="text-3xl font-bold text-[#001f3f] mb-6">Aba de Solicitações</h1>
+                    <div class="card p-8 rounded-3xl space-y-6">
+                        <div class="flex items-start gap-4">
+                            <span class="text-4xl">📋</span>
+                            <div>
+                                <h2 class="text-xl font-bold text-[#001f3f]">O que é esta aba?</h2>
+                                <p class="text-gray-600 mt-2">Esta é a central de comunicação entre os <strong>Supervisores de Campo</strong> e o <strong>Almoxarifado</strong>.</p>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
+                            <div class="p-4 bg-blue-50 rounded-2xl border border-blue-100">
+                                <h3 class="font-bold text-blue-800">1. Pedidos Externos</h3>
+                                <p class="text-sm text-blue-700">Quando um funcionário no posto precisa de um novo uniforme ou material de limpeza, o supervisor abre uma "Solicitação" aqui.</p>
+                            </div>
+                            <div class="p-4 bg-amber-50 rounded-2xl border border-amber-100">
+                                <h3 class="font-bold text-amber-800">2. Fluxo de Aprovação</h3>
+                                <p class="text-sm text-amber-700">O pedido aparece para o Almoxarife, que verifica se há estoque, separa o material e marca como "Entregue".</p>
+                            </div>
+                        </div>
+                        <p class="text-sm italic text-gray-400">Esta aba garante que nada saia do almoxarifado sem uma requisição oficial vinculada a um setor.</p>
+                    </div>`;
             } else if (view === 'relatorios') {
                 main.innerHTML = `
                     <h1 class="text-3xl font-bold text-[#001f3f] mb-6">Relatórios</h1>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div onclick="exportEstoquePDF()" class="card p-8 rounded-3xl cursor-pointer hover:bg-gray-50 flex items-center gap-4">
-                            <span class="text-4xl">📄</span>
-                            <div><p class="font-bold">PDF de Estoque Atual</p><p class="text-xs text-gray-500">Lista completa com valores totais</p></div>
-                        </div>
+                    <div onclick="exportEstoquePDF()" class="card p-8 rounded-3xl cursor-pointer hover:bg-gray-50 flex items-center gap-4 max-w-md">
+                        <span class="text-4xl">📄</span>
+                        <div><p class="font-bold">PDF de Estoque Atual</p><p class="text-xs text-gray-500">Lista completa com valores totais</p></div>
                     </div>`;
-            } else {
-                main.innerHTML = `<div class="text-center py-20 text-gray-400">Em desenvolvimento...</div>`;
             }
         }
 
@@ -174,37 +190,64 @@
                     <table class="w-full text-left">
                         <thead class="bg-gray-50 border-b">
                             <tr class="text-[10px] uppercase text-gray-400">
-                                <th class="p-6">Produto</th><th class="p-6 text-center">Qtd</th><th class="p-6">V. Unitário</th><th class="p-6">V. Total</th>
+                                <th class="p-6">Produto</th><th class="p-6 text-center">Qtd</th><th class="p-6">V. Unitário</th><th class="p-6">Ações</th>
                             </tr>
                         </thead>
                         <tbody>
                             ${DB.products.map(p => `
                                 <tr class="border-b ${p.qty <= p.minStock ? 'row-critical' : ''}">
-                                    <td class="p-6 font-bold text-[#001f3f]">${p.name} <br> <span class="text-[10px] text-gray-400 uppercase tracking-tighter">${p.category}</span></td>
+                                    <td class="p-6">
+                                        <p class="font-bold text-[#001f3f]">${p.name}</p>
+                                        <span class="text-[10px] text-gray-400 uppercase">${p.category}</span>
+                                    </td>
                                     <td class="p-6 text-center font-bold">${p.qty}</td>
                                     <td class="p-6 text-sm text-gray-500">${formatCurrency(p.unitValue)}</td>
-                                    <td class="p-6 font-bold text-[#001f3f]">${formatCurrency(p.qty * p.unitValue)}</td>
+                                    <td class="p-6">
+                                        <div class="flex gap-2">
+                                            <button onclick="editProduct(${p.id})" class="text-blue-600 hover:bg-blue-50 p-2 rounded-lg">✏️</button>
+                                            <button onclick="deleteProduct(${p.id})" class="text-red-600 hover:bg-red-50 p-2 rounded-lg">🗑️</button>
+                                        </div>
+                                    </td>
                                 </tr>`).join('')}
                         </tbody>
                     </table>
                 </div>`;
         }
 
-        // --- MODAIS ---
+        // --- FUNÇÕES DE PRODUTO ---
         function showAddProduct() {
             openModal(`
                 <div class="p-8">
                     <h2 class="text-xl font-bold mb-4">Cadastrar Produto</h2>
                     <div class="space-y-3">
-                        <input id="p-name" placeholder="Nome do Produto" class="w-full p-3 border rounded-xl">
-                        <input id="p-cat" placeholder="Categoria (ex: Uniforme)" class="w-full p-3 border rounded-xl">
+                        <input id="p-name" placeholder="Nome do Produto" class="w-full p-3 border rounded-xl outline-none focus:border-[#ffd700]">
+                        <input id="p-cat" placeholder="Categoria (ex: Limpeza)" class="w-full p-3 border rounded-xl outline-none">
                         <div class="flex gap-2">
-                            <input id="p-qty" type="number" placeholder="Qtd Inicial" class="w-1/2 p-3 border rounded-xl">
-                            <input id="p-min" type="number" placeholder="Estoque Mínimo" class="w-1/2 p-3 border rounded-xl">
+                            <input id="p-qty" type="number" placeholder="Qtd Inicial" class="w-1/2 p-3 border rounded-xl outline-none">
+                            <input id="p-min" type="number" placeholder="Estoque Mínimo" class="w-1/2 p-3 border rounded-xl outline-none">
                         </div>
-                        <input id="p-val" type="number" placeholder="Valor Unitário R$" class="w-full p-3 border rounded-xl">
+                        <input id="p-val" type="number" placeholder="Valor Unitário R$" class="w-full p-3 border rounded-xl outline-none">
                     </div>
                     <button onclick="saveNewProduct()" class="w-full bg-[#001f3f] text-white mt-6 py-3 rounded-2xl font-bold">Salvar Cadastro</button>
+                </div>
+            `);
+        }
+
+        function editProduct(id) {
+            const p = DB.products.find(x => x.id === id);
+            openModal(`
+                <div class="p-8">
+                    <h2 class="text-xl font-bold mb-4">Alterar Produto</h2>
+                    <div class="space-y-3">
+                        <input id="e-name" value="${p.name}" class="w-full p-3 border rounded-xl outline-none">
+                        <input id="e-cat" value="${p.category}" class="w-full p-3 border rounded-xl outline-none">
+                        <div class="flex gap-2">
+                            <input id="e-qty" type="number" value="${p.qty}" class="w-1/2 p-3 border rounded-xl outline-none">
+                            <input id="e-min" type="number" value="${p.minStock}" class="w-1/2 p-3 border rounded-xl outline-none">
+                        </div>
+                        <input id="e-val" type="number" value="${p.unitValue}" class="w-full p-3 border rounded-xl outline-none">
+                    </div>
+                    <button onclick="saveEditProduct(${p.id})" class="w-full bg-[#001f3f] text-white mt-6 py-3 rounded-2xl font-bold">Salvar Alterações</button>
                 </div>
             `);
         }
@@ -223,13 +266,30 @@
             save(); closeModal(); renderEstoque();
         }
 
+        function saveEditProduct(id) {
+            const p = DB.products.find(x => x.id === id);
+            p.name = document.getElementById('e-name').value;
+            p.category = document.getElementById('e-cat').value;
+            p.qty = Number(document.getElementById('e-qty').value);
+            p.minStock = Number(document.getElementById('e-min').value);
+            p.unitValue = Number(document.getElementById('e-val').value);
+            save(); closeModal(); renderEstoque();
+        }
+
+        function deleteProduct(id) {
+            if(confirm("Tem certeza que deseja excluir este produto do sistema?")) {
+                DB.products = DB.products.filter(p => p.id !== id);
+                save(); renderEstoque();
+            }
+        }
+
         function showEntradaModal() {
             let options = DB.products.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
             openModal(`
                 <div class="p-8">
-                    <h2 class="text-xl font-bold mb-4">Registrar Entrada 📥</h2>
-                    <select id="mov-id" class="w-full p-3 border rounded-xl mb-3">${options}</select>
-                    <input id="mov-qty" type="number" placeholder="Quantidade para somar" class="w-full p-3 border rounded-xl">
+                    <h2 class="text-xl font-bold mb-4 text-green-700">Registrar Entrada 📥</h2>
+                    <select id="mov-id" class="w-full p-3 border rounded-xl mb-3 outline-none">${options}</select>
+                    <input id="mov-qty" type="number" placeholder="Quantidade para somar" class="w-full p-3 border rounded-xl outline-none">
                     <button onclick="execMov('entrada')" class="w-full bg-green-600 text-white mt-6 py-3 rounded-2xl font-bold">Confirmar Entrada</button>
                 </div>
             `);
@@ -239,9 +299,9 @@
             let options = DB.products.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
             openModal(`
                 <div class="p-8">
-                    <h2 class="text-xl font-bold mb-4">Registrar Saída 📤</h2>
-                    <select id="mov-id" class="w-full p-3 border rounded-xl mb-3">${options}</select>
-                    <input id="mov-qty" type="number" placeholder="Quantidade para retirar" class="w-full p-3 border rounded-xl">
+                    <h2 class="text-xl font-bold mb-4 text-blue-700">Registrar Saída 📤</h2>
+                    <select id="mov-id" class="w-full p-3 border rounded-xl mb-3 outline-none">${options}</select>
+                    <input id="mov-qty" type="number" placeholder="Quantidade para retirar" class="w-full p-3 border rounded-xl outline-none">
                     <button onclick="execMov('saida')" class="w-full bg-blue-600 text-white mt-6 py-3 rounded-2xl font-bold">Confirmar Saída</button>
                 </div>
             `);
@@ -271,17 +331,17 @@
             const doc = new jsPDF();
             doc.text("QGA - Relatório de Estoque Atual", 14, 15);
             const data = DB.products.map(p => [p.name, p.category, p.qty, formatCurrency(p.unitValue), formatCurrency(p.qty * p.unitValue)]);
-            doc.autoTable({
-                head: [['Produto', 'Categoria', 'Qtd', 'V. Un', 'V. Total']],
-                body: data,
-                startY: 25
-            });
+            doc.autoTable({ head: [['Produto', 'Categoria', 'Qtd', 'V. Un', 'V. Total']], body: data, startY: 25 });
             doc.save("estoque-quantica.pdf");
         }
 
         window.onload = () => {
             const saved = localStorage.getItem('qga_db');
-            if (saved) DB = JSON.parse(saved);
+            if (saved) {
+                DB = JSON.parse(saved);
+                // Garantir que os IDs antigos funcionem com o novo sistema
+                DB.products.forEach(p => { if(!p.id) p.id = Math.random(); });
+            }
         };
     </script>
 </body>
